@@ -20,6 +20,12 @@ export default function Home() {
     const [potSize, setPotSize] = useState<string>('');
     const [toCall, setToCall] = useState<string>('');
     const [editingSlot, setEditingSlot] = useState<{ type: 'hole' | 'community', index: number } | null>(null);
+    const [mounted, setMounted] = useState(false);
+
+    // Prevent hydration issues
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // Track all selected cards to disable them in selector
     const allSelectedCards = [...holeCards, ...communityCards].filter((c): c is CardType => c !== null);
@@ -124,6 +130,8 @@ export default function Home() {
             }
         }, 100);
     };
+
+    if (!mounted) return null;
 
     return (
         <main className="flex min-h-screen flex-col items-center bg-[#0a0a0a] p-4 md:p-8 selection:bg-casino-green selection:text-white">

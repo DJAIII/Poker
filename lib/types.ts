@@ -4,7 +4,6 @@ export type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'T' | 'J' | '
 export interface CardType {
     rank: Rank;
     suit: Suite;
-    toString: () => string;
 }
 
 export interface SimulationResult {
