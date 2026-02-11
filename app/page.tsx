@@ -11,8 +11,8 @@ import { calculateOdds } from '@/lib/poker-engine';
 import { Loader2, RefreshCw } from 'lucide-react';
 
 export default function Home() {
-    const [holeCards, setHoleCards] = useState<CardType[]>([]);
-    const [communityCards, setCommunityCards] = useState<CardType[]>([]);
+    const [holeCards, setHoleCards] = useState<(CardType | null)[]>([null, null]);
+    const [communityCards, setCommunityCards] = useState<(CardType | null)[]>([null, null, null, null, null]);
     const [numOpponents, setNumOpponents] = useState<number>(1);
     const [activeSelection, setActiveSelection] = useState<'hole' | 'flop1' | 'flop2' | 'flop3' | 'turn' | 'river' | null>(null);
     const [calculating, setCalculating] = useState(false);
@@ -22,7 +22,7 @@ export default function Home() {
     const [editingSlot, setEditingSlot] = useState<{ type: 'hole' | 'community', index: number } | null>(null);
 
     // Track all selected cards to disable them in selector
-    const allSelectedCards = [...holeCards, ...communityCards];
+    const allSelectedCards = [...holeCards, ...communityCards].filter((c): c is CardType => c !== null);
 
     const handleCardSelect = (card: CardType) => {
         // If card is already selected elsewhere, ignore
@@ -31,22 +31,28 @@ export default function Home() {
         }
 
         if (activeSelection === 'hole') {
-            if (holeCards.length < 2) {
-                setHoleCards([...holeCards, card]);
-            } else {
-                // Replace the last card or implement specific replacement logic
-                // For simplicity, just append if < 2, else do nothing (user should remove first)
-                // Or better: clicking a card in hand removes it.
+            const index = holeCards.findIndex(c => c === null);
+            if (index !== -1) {
+                const newCards = [...holeCards];
+                newCards[index] = card;
+                setHoleCards(newCards);
             }
         } else if (activeSelection === 'flop1' || activeSelection === 'flop2' || activeSelection === 'flop3' || activeSelection === 'turn' || activeSelection === 'river') {
-            // Logic for specific community card slot selection would go here
-            // simplified below
+            // ... hande specific types if needed
         } else {
             // Auto-fill logic
-            if (holeCards.length < 2) {
-                setHoleCards([...holeCards, card]);
-            } else if (communityCards.length < 5) {
-                setCommunityCards([...communityCards, card]);
+            const holeIdx = holeCards.findIndex(c => c === null);
+            if (holeIdx !== -1) {
+                const newCards = [...holeCards];
+                newCards[holeIdx] = card;
+                setHoleCards(newCards);
+            } else {
+                const commIdx = communityCards.findIndex(c => c === null);
+                if (commIdx !== -1) {
+                    const newCards = [...communityCards];
+                    newCards[commIdx] = card;
+                    setCommunityCards(newCards);
+                }
             }
         }
 
@@ -56,14 +62,14 @@ export default function Home() {
 
     const removeHoleCard = (index: number) => {
         const newCards = [...holeCards];
-        newCards.splice(index, 1);
+        newCards[index] = null;
         setHoleCards(newCards);
         setResult(null);
     };
 
     const removeCommunityCard = (index: number) => {
         const newCards = [...communityCards];
-        newCards.splice(index, 1);
+        newCards[index] = null;
         setCommunityCards(newCards);
         setResult(null);
     };
@@ -92,22 +98,24 @@ export default function Home() {
     };
 
     const resetAll = () => {
-        setHoleCards([]);
-        setCommunityCards([]);
+        setHoleCards([null, null]);
+        setCommunityCards([null, null, null, null, null]);
         setResult(null);
         setCalculating(false);
     };
 
     const runCalculation = async () => {
-        if (holeCards.length !== 2) return;
+        const validHole = holeCards.filter((c): c is CardType => c !== null);
+        const validComm = communityCards.filter((c): c is CardType => c !== null);
+
+        if (validHole.length !== 2) return;
 
         setCalculating(true);
 
         // Use setTimeout to allow UI to update before heavy calculation
-        // In a real app, use a Web Worker. Here we'll use a promise wrapper.
         setTimeout(async () => {
             try {
-                const res = await calculateOdds(holeCards, communityCards, numOpponents);
+                const res = await calculateOdds(validHole, validComm, numOpponents);
                 setResult(res);
             } catch (error) {
                 console.error(error);
@@ -189,9 +197,9 @@ export default function Home() {
                         {/* Calculate Button - Moved here */}
                         <button
                             onClick={runCalculation}
-                            disabled={holeCards.length < 2 || calculating}
+                            disabled={holeCards.filter(c => c !== null).length < 2 || calculating}
                             className={`w-full py-4 rounded-xl text-lg font-bold shadow-lg transition-all transform active:scale-[0.99]
-                        ${holeCards.length < 2
+                        ${holeCards.filter(c => c !== null).length < 2
                                     ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
                                     : 'bg-gradient-to-r from-emerald-600 to-green-500 hover:from-emerald-500 hover:to-green-400 text-white shadow-emerald-900/50 hover:shadow-emerald-900/70'
                                 }
@@ -210,46 +218,39 @@ export default function Home() {
 
                     {/* Right Column: Betting Advisor & Card Selector */}
                     <div className="xl:col-span-3 order-3 space-y-6">
-                        {result ? (
-                            <div className="bg-slate-900 border border-white/10 rounded-xl p-6 shadow-xl animate-in fade-in slide-in-from-left-4 duration-500">
-                                <h3 className="text-sm font-medium text-slate-400 mb-4 uppercase tracking-wider">베팅 어드바이저</h3>
+                        <div className="bg-slate-900 border border-white/10 rounded-xl p-6 shadow-xl">
+                            <h3 className="text-sm font-medium text-slate-400 mb-4 uppercase tracking-wider">베팅 어드바이저</h3>
 
-                                <div className="space-y-4 mb-4">
-                                    <div>
-                                        <label className="text-xs text-slate-500 mb-1 block">현재 팟 ($)</label>
-                                        <input
-                                            type="number"
-                                            value={potSize}
-                                            onChange={(e) => setPotSize(e.target.value)}
-                                            placeholder="0"
-                                            className="w-full bg-slate-800 border border-white/10 rounded px-3 py-2 text-white outline-none focus:border-green-500 transition-colors"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs text-slate-500 mb-1 block">콜 금액 ($)</label>
-                                        <input
-                                            type="number"
-                                            value={toCall}
-                                            onChange={(e) => setToCall(e.target.value)}
-                                            placeholder="0"
-                                            className="w-full bg-slate-800 border border-white/10 rounded px-3 py-2 text-white outline-none focus:border-green-500 transition-colors"
-                                        />
-                                    </div>
+                            <div className="space-y-4 mb-4">
+                                <div>
+                                    <label className="text-xs text-slate-500 mb-1 block">현재 팟 ($)</label>
+                                    <input
+                                        type="number"
+                                        value={potSize}
+                                        onChange={(e) => setPotSize(e.target.value)}
+                                        placeholder="0"
+                                        className="w-full bg-slate-800 border border-white/10 rounded px-3 py-2 text-white outline-none focus:border-green-500 transition-colors"
+                                    />
                                 </div>
-
-                                <BettingAdvisor
-                                    winRate={result.equity}
-                                    potSize={parseFloat(potSize || '0')}
-                                    toCall={parseFloat(toCall || '0')}
-                                />
+                                <div>
+                                    <label className="text-xs text-slate-500 mb-1 block">콜 금액 ($)</label>
+                                    <input
+                                        type="number"
+                                        value={toCall}
+                                        onChange={(e) => setToCall(e.target.value)}
+                                        placeholder="0"
+                                        className="w-full bg-slate-800 border border-white/10 rounded px-3 py-2 text-white outline-none focus:border-green-500 transition-colors"
+                                    />
+                                </div>
                             </div>
-                        ) : (
-                            <div className="hidden xl:block bg-slate-900/30 border border-white/5 rounded-xl p-6 text-center text-slate-500 text-sm">
-                                <p>계산 후 이곳에서 베팅 조언을 확인하세요.</p>
-                            </div>
-                        )}
 
-
+                            {/* Always visible component, internal logic handles empty state */}
+                            <BettingAdvisor
+                                winRate={result?.equity || 0}
+                                potSize={Number(potSize) || 0}
+                                toCall={Number(toCall) || 0}
+                            />
+                        </div>
 
                         <div className="bg-slate-900 p-4 rounded-xl border border-white/10 hidden md:block">
                             <h3 className="text-sm font-medium text-slate-400 mb-4 uppercase tracking-wider">카드 선택</h3>

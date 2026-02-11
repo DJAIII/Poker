@@ -4,8 +4,8 @@ import PlayingCard from './PlayingCard';
 import { X } from 'lucide-react';
 
 interface PokerTableProps {
-    holeCards: CardType[];
-    communityCards: CardType[];
+    holeCards: (CardType | null)[];
+    communityCards: (CardType | null)[];
     activeSelection?: string | null;
     onRemoveHole: (index: number) => void;
     onRemoveCommunity: (index: number) => void;

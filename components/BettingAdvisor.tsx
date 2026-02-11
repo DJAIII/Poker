@@ -12,42 +12,35 @@ interface BettingAdvisorProps {
 const BettingAdvisor: React.FC<BettingAdvisorProps> = ({ winRate, potSize, toCall }) => {
 
     const advice = useMemo(() => {
-        // Basic validations
-        if (potSize <= 0 || toCall <= 0) return null;
+        // 안전한 숫자 변환
+        const pSize = Number(potSize) || 0;
+        const callAmt = Number(toCall) || 0;
+        const wRate = Number(winRate) || 0;
 
-        const potOdds = (toCall / (potSize + toCall)) * 100;
-        // Expected Value: (Win% * Pot) - (Lose% * Call)
-        // Actually, simple Pot Odds comparison is easier:
-        // If Win% > Pot Odds, it's +EV.
+        // 필수 값 체크 (0 이하일 경우 계산 보류)
+        if (pSize <= 0 || callAmt <= 0) return null;
 
-        // EV Calculation for display
-        // Win Payout = Pot Size
-        // Cost = To Call
-        // EV = (Win% * PotSize) - (Lose% * ToCall)
-        const winProb = winRate / 100;
+        const potOdds = (callAmt / (pSize + callAmt)) * 100;
+        const winProb = wRate / 100;
         const loseProb = 1 - winProb;
-        const ev = (winProb * potSize) - (loseProb * toCall);
+        const ev = (winProb * pSize) - (loseProb * callAmt);
 
         let recommendation = "";
         let reason = "";
         let type: 'raise' | 'call' | 'fold' | 'bluff' = 'fold';
 
-        if (winRate > 70) {
-            recommendation = "강력한 레이즈 (Strong Raise)";
+        if (wRate > 70) {
+            recommendation = "강력한 레이즈";
             type = 'raise';
-            reason = `승률(${winRate}%)이 매우 높습니다. 밸류 벳을 통해 이익을 극대화하세요.`;
-        } else if (winRate > potOdds) {
+            reason = `승률이 매우 높습니다. 밸류 벳을 통해 이익을 극대화하세요.`;
+        } else if (wRate > potOdds) {
             recommendation = "콜 (Call)";
             type = 'call';
-            reason = `승률(${winRate}%)이 팟 오즈(${potOdds.toFixed(1)}%)보다 높습니다. 장기적으로 이익(+EV)인 콜입니다.`;
-        } else if (winRate > potOdds * 0.8) { // Slightly loose definition for bluff/draw potential
-            recommendation = "폴드 또는 블러핑 (Fold / Bluff)";
-            type = 'bluff';
-            reason = `승률(${winRate}%)이 팟 오즈(${potOdds.toFixed(1)}%)보다 낮지만, 개선 가능성이 있다면 고려해볼 수 있습니다.`;
+            reason = `승률(${wRate.toFixed(1)}%)이 팟 오즈(${potOdds.toFixed(1)}%)보다 높아 장기적으로 이익입니다.`;
         } else {
             recommendation = "폴드 (Fold)";
             type = 'fold';
-            reason = `승률(${winRate}%)이 팟 오즈(${potOdds.toFixed(1)}%)보다 낮아 기대 수익(-EV)이 마이너스입니다.`;
+            reason = `승률이 팟 오즈보다 낮아 기대 수익이 마이너스입니다.`;
         }
 
         return {
@@ -59,11 +52,12 @@ const BettingAdvisor: React.FC<BettingAdvisorProps> = ({ winRate, potSize, toCal
         };
     }, [winRate, potSize, toCall]);
 
+    // 조언 데이터가 없을 때 표시할 안내 문구
     if (!advice) {
         return (
-            <div className="bg-slate-900 border border-white/10 rounded-xl p-6 text-center text-slate-400 text-sm">
-                <Calculator className="mx-auto mb-2 opacity-50" />
-                팟 사이즈와 콜 비용을 입력하여 베팅 조언을 받으세요.
+            <div className="flex flex-col items-center justify-center py-8 text-slate-500 italic border-t border-white/5 mt-4">
+                <Calculator className="mb-2 opacity-20" size={32} />
+                <p className="text-sm">팟 사이즈와 콜 비용을 입력하세요</p>
             </div>
         );
     }
@@ -73,8 +67,7 @@ const BettingAdvisor: React.FC<BettingAdvisorProps> = ({ winRate, potSize, toCal
             "border rounded-xl p-6 shadow-xl transition-all duration-500",
             advice.type === 'raise' ? "bg-emerald-950/50 border-emerald-500/50" :
                 advice.type === 'call' ? "bg-blue-950/50 border-blue-500/50" :
-                    advice.type === 'bluff' ? "bg-amber-950/50 border-amber-500/50" :
-                        "bg-rose-950/50 border-rose-500/50"
+                    "bg-rose-950/50 border-rose-500/50"
         )}>
             <div className="flex items-start justify-between mb-4">
                 <div>
@@ -82,8 +75,7 @@ const BettingAdvisor: React.FC<BettingAdvisorProps> = ({ winRate, potSize, toCal
                         "text-2xl font-bold uppercase tracking-tight",
                         advice.type === 'raise' ? "text-emerald-400" :
                             advice.type === 'call' ? "text-blue-400" :
-                                advice.type === 'bluff' ? "text-amber-400" :
-                                    "text-rose-400"
+                                "text-rose-400"
                     )}>
                         {advice.recommendation}
                     </h3>
@@ -105,13 +97,11 @@ const BettingAdvisor: React.FC<BettingAdvisorProps> = ({ winRate, potSize, toCal
                     "p-3 rounded-full",
                     advice.type === 'raise' ? "bg-emerald-500/20 text-emerald-400" :
                         advice.type === 'call' ? "bg-blue-500/20 text-blue-400" :
-                            advice.type === 'bluff' ? "bg-amber-500/20 text-amber-400" :
-                                "bg-rose-500/20 text-rose-400"
+                            "bg-rose-500/20 text-rose-400"
                 )}>
                     {advice.type === 'raise' ? <ThumbsUp size={24} /> :
                         advice.type === 'call' ? <ArrowRight size={24} /> :
-                            advice.type === 'bluff' ? <AlertCircle size={24} /> :
-                                <ThumbsDown size={24} />}
+                            <ThumbsDown size={24} />}
                 </div>
             </div>
 
